@@ -1,6 +1,12 @@
 <!-- TODO: Header? -->
 <body>
     <div class="main-content">
+        <% if (locals.successMessage) { %>
+            <p class="success-message"><%= successMessage %></p>
+        <% } %>
+        <% if (locals.errorMessage) { %>
+            <p class="success-message"><%= errorMessage %></p>
+        <% } %>
         <h1>Create a New Poll</h1>
         <form action="/createPoll" method="POST">
             <div class="form-input-container">
@@ -17,6 +23,10 @@
             </div>
             <!-- If necessary, you can add more options similar to how they were added above -->
             <button type="submit" class="action-button full-width">Create Poll</button>
+        </form>
+
+        <form action="/authenticatedIndex" method="GET">
+            <button type="submit">View all polls</button>
         </form>
     </div>
 </body>

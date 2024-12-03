@@ -4,12 +4,40 @@ const path = require('path');
 const mongoose = require('mongoose');
 const session = require('express-session');
 const bcrypt = require('bcrypt');
+const { connect } = require('http2');
+const { connected } = require('process');
+const { request } = require('http');
 
 const PORT = 3000;
 //TODO: Update this URI to match your own MongoDB setup
-const MONGO_URI = 'mongodb://localhost:27017/keyin_test';
+const MONGO_URI = 'mongodb://localhost:27017/FinalsDatabase';
 const app = express();
 expressWs(app);
+const SALT_ROUNDS = 10;
+
+// moved the connection up here made more sense to me
+mongoose.connect(MONGO_URI)
+    .then(() => app.listen(PORT, () => console.log(`Server running on http://localhost:${PORT}`)))
+    .catch((err) => console.error('MongoDB connection error:', err));
+
+
+const userSchema = new mongoose.Schema({
+    username: { type: String, required: true },
+    password: { type: String, required: true },
+  });
+
+const pollSchema = new mongoose.Schema({
+    question: {type: String, required: true},
+    options: [
+        {
+            answer: {type: String, required: true},
+            votes: { type: Number, required: true, default: 0 },
+        }
+    ]
+});
+
+const User = mongoose.model('User', userSchema);
+const Polls = mongoose.model('Polls', pollSchema);
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
@@ -42,16 +70,66 @@ app.get('/', async (request, response) => {
     if (request.session.user?.id) {
         return response.redirect('/dashboard');
     }
-
-    response.render('index/unauthenticatedIndex', {});
+    const polls = await Polls.find();
+    response.render('index/unauthenticatedIndex', { polls , totalPolls: polls.length});
 });
 
 app.get('/login', async (request, response) => {
+    if (request.session.user?.id) {
+        return response.redirect('/dashboard');
+    }
+    
+    esponse.render("login")
+});
+
+
+
+
+
+app.get('/authenticatedIndex', async (request, response) =>{
+    if (request.session.user?.id) {
+        return response.redirect('/dashboard');
+    }
+    
+    try{
+        const polls = await Polls.find();
+        response.render('index/authenticatedIndex', { polls });
+    }catch(err){
+        console.log("whoops!")
+    }
     
 });
 
+
+
+
+
+
+
 app.post('/login', async (request, response) => {
     
+    const {username, password} = request.body;
+    
+    try {
+        const user = await User.findOne({username: username});
+        
+        if(!user){
+            return response.render("login", {errorMessage: "Invalid Credentials."})
+        }
+
+        const checkPass = bcrypt.compareSync(password, user.password);
+
+        if(!checkPass){
+            return response.render("login", {errorMessage: "Invalid Credentials."})
+        }
+    
+        request.session.user = {id: user._id, username: user.username};
+        response.redirect('/createPoll');
+    }catch(err){
+        response.render("login", {errorMessage: "There was an error signing in."})
+    }
+
+   
 });
 
 app.get('/signup', async (request, response) => {
@@ -62,6 +140,26 @@ app.get('/signup', async (request, response) => {
     return response.render('signup', { errorMessage: null });
 });
 
+app.post("/signup", async (req, res) => {
+    const { username, password } = req.body;
+
+    try {
+       
+        const hashedPassword = bcrypt.hashSync(password, SALT_ROUNDS);
+
+    
+        const newUser = new User({ username, password: hashedPassword });
+
+       
+        await newUser.save();
+        console.log("User saved to MongoDB");
+
+        res.render("signup", { errorMessage: "Your account has been made" });
+    } catch (err) {
+        console.error("Error saving user to MongoDB:", err);
+    }
+});
+
 app.get('/dashboard', async (request, response) => {
     if (!request.session.user?.id) {
         return response.redirect('/');
@@ -69,7 +167,7 @@ app.get('/dashboard', async (request, response) => {
 
     //TODO: Fix the polls, this should contain all polls that are active. I'd recommend taking a look at the
     //authenticatedIndex template to see how it expects polls to be represented
-    return response.render('index/authenticatedIndex', { polls: [] });
+    return response.render('/authenticatedIndex', { polls: [] });
 });
 
 app.get('/profile', async (request, response) => {
@@ -81,7 +179,7 @@ app.get('/createPoll', async (request, response) => {
         return response.redirect('/');
     }
 
-    return response.render('createPoll')
+    return response.render('createPoll',)
 });
 
 // Poll creation
@@ -89,13 +187,14 @@ app.post('/createPoll', async (request, response) => {
     const { question, options } = request.body;
     const formattedOptions = Object.values(options).map((option) => ({ answer: option, votes: 0 }));
 
-    const pollCreationError = onCreateNewPoll(question, formattedOptions);
+    const test = onCreateNewPoll(question, formattedOptions);
+    if(!test){
+        response.render("createPoll", {errorMessage: "Poll womp"})
+    }
+    response.render("createPoll", {successMessage: "Poll made"})
     //TODO: If an error occurs, what should we do?
 });
 
-mongoose.connect(MONGO_URI)
-    .then(() => app.listen(PORT, () => console.log(`Server running on http://localhost:${PORT}`)))
-    .catch((err) => console.error('MongoDB connection error:', err));
 
 /**
  * Handles creating a new poll, based on the data provided to the server
@@ -107,6 +206,11 @@ mongoose.connect(MONGO_URI)
 async function onCreateNewPoll(question, pollOptions) {
     try {
         //TODO: Save the new poll to MongoDB
+        const newPoll = new Polls({ question, options: pollOptions }); 
+        await newPoll.save();
+        console.log("Poll saved to MongoDB");
+        return true;
+        // response.render("createPoll", { successMessage: "Your poll has been made!" });
     }
     catch (error) {
         console.error(error);
