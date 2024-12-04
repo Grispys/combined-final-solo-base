@@ -39,6 +39,11 @@ const pollSchema = new mongoose.Schema({
 const User = mongoose.model('User', userSchema);
 const Polls = mongoose.model('Polls', pollSchema);
 
+// some middleware so that the header can check is someone is signed in
+app.use((request, response, next) => {
+    response.locals.session = request.session;
+    next();
+});
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(express.static(path.join(__dirname, 'public')));
@@ -48,6 +53,9 @@ app.use(session({
     secret: 'voting-app-secret',
     resave: false,
     saveUninitialized: false,
+    cookie:{
+        secure: false
+    }
 }));
 let connectedClients = [];
 
@@ -71,34 +79,43 @@ app.get('/', async (request, response) => {
         return response.redirect('/dashboard');
     }
     const polls = await Polls.find();
-    response.render('index/unauthenticatedIndex', { polls , totalPolls: polls.length});
+    response.render('index/unauthenticatedIndex', { polls , totalPolls: polls.length, session: request.session});
 });
+
+
+
+
+
+
+
 
 app.get('/login', async (request, response) => {
     if (request.session.user?.id) {
         return response.redirect('/dashboard');
     }
     
-    esponse.render("login")
+    response.render("login")
 });
 
 
 
+app.post('/goBack', async(request, response)=>{
+    response.redirect('/')
+});
+
 
 
 app.get('/authenticatedIndex', async (request, response) =>{
-    if (request.session.user?.id) {
-        return response.redirect('/dashboard');
-    }
-    
     try{
         const polls = await Polls.find();
-        response.render('index/authenticatedIndex', { polls });
+        response.render('index/authenticatedIndex', { polls, totalPolls: polls.length, session: request.session });
     }catch(err){
         console.log("whoops!")
     }
     
 });
+
+
 
 
 
@@ -124,13 +141,24 @@ app.post('/login', async (request, response) => {
         }
     
         request.session.user = {id: user._id, username: user.username};
-        response.redirect('/createPoll');
+        response.redirect('/authenticatedIndex');
     }catch(err){
         response.render("login", {errorMessage: "There was an error signing in."})
     }
 
    
 });
+
+app.post('/logout', async(request, response) =>{
+    request.session.destroy();
+    response.redirect('/dashboard')
+});
+
+
+
+
+
+
 
 app.get('/signup', async (request, response) => {
     if (request.session.user?.id) {
@@ -139,6 +167,13 @@ app.get('/signup', async (request, response) => {
 
     return response.render('signup', { errorMessage: null });
 });
+
+
+
+
+
+
+
 
 app.post("/signup", async (req, res) => {
     const { username, password } = req.body;
@@ -160,27 +195,65 @@ app.post("/signup", async (req, res) => {
     }
 });
 
+
+
+
+
+
+
+
+
+
+// ~~I guess i don't need a get for the dashboard? i need post for the nav button. get doesnt do anything? am i stupid? i'm stupid~~
+// UPDATE: i am actually stupid. i need get for redirects and POST for form submission. dummy
+
 app.get('/dashboard', async (request, response) => {
     if (!request.session.user?.id) {
         return response.redirect('/');
     }
-
+    const polls = await Polls.find();
     //TODO: Fix the polls, this should contain all polls that are active. I'd recommend taking a look at the
     //authenticatedIndex template to see how it expects polls to be represented
-    return response.render('/authenticatedIndex', { polls: [] });
+    return  response.render('index/authenticatedIndex', { polls, totalPolls: polls.length, session: request.session })
 });
+
+app.post('/dashboard', async (request, response) => {
+    if (!request.session.user?.id) {
+        return response.redirect('/');
+    }
+    const polls = await Polls.find();
+    //TODO: Fix the polls, this should contain all polls that are active. I'd recommend taking a look at the
+    //authenticatedIndex template to see how it expects polls to be represented
+    return  response.render('index/authenticatedIndex', { polls, totalPolls: polls.length, session: request.session })
+});
+
+
+
+
 
 app.get('/profile', async (request, response) => {
     
 });
+
+
+
+
 
 app.get('/createPoll', async (request, response) => {
     if (!request.session.user?.id) {
         return response.redirect('/');
     }
 
-    return response.render('createPoll',)
+    return response.render('createPoll', {session: request.session})
 });
+
+
+
+
+
+
+
+
 
 // Poll creation
 app.post('/createPoll', async (request, response) => {
@@ -189,11 +262,20 @@ app.post('/createPoll', async (request, response) => {
 
     const test = onCreateNewPoll(question, formattedOptions);
     if(!test){
-        response.render("createPoll", {errorMessage: "Poll womp"})
+        response.render("createPoll", {errorMessage: "Poll womp", session: request.session})
     }
-    response.render("createPoll", {successMessage: "Poll made"})
+    response.render("createPoll", {successMessage: "Poll made", session: request.session})
     //TODO: If an error occurs, what should we do?
 });
+
+
+
+
+
+
+
+
+
 
 
 /**
@@ -221,6 +303,14 @@ async function onCreateNewPoll(question, pollOptions) {
 
     return null;
 }
+
+
+
+
+
+
+
+
 
 /**
  * Handles processing a new vote on a poll
