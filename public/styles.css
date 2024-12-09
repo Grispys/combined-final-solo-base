@@ -156,14 +156,27 @@ button.action-button {
 }
 
 button.action-button:hover {
-    background: rgba(246, 246, 246, 0.8);
-    color: rgba(93, 142, 251, 0.8);
+    background: rgba(246, 246, 246, 0.993);
+    color: rgba(37, 37, 37, 0.8);
     cursor: pointer;
 }
 
+.navigation button{
+    background-color: rgba(255, 255, 255, 0);
+    font-family: 'Lato', sans-serif;
+    border: 0;
+    color: white;
+    font-size: 16px;
+    cursor: pointer;
+    text-decoration: underline;
+    padding-top: 10px;
+}
+
+/* .navigation button:hover, */
 
 .navigation{
     text-align: center;
+    color: white;
 }
 
 nav {
@@ -188,3 +201,9 @@ nav ul li a {
     padding-left: 20px;
     padding-right: 20px;
 }
+
+
+
+
+
+

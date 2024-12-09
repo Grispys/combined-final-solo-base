@@ -6,6 +6,9 @@ socket.addEventListener('message', (event) => {
     const data = JSON.parse(event.data);
 
     //TODO: Handle the events from the socket
+    if (data.type === 'update') {
+        onIncomingVote(data.data)
+    }
 });
 
 
@@ -34,7 +37,20 @@ function onNewPollAdded(data) {
  * @param {*} data The data from the server (probably containing which poll was updated and the new vote values for that poll)
  */
 function onIncomingVote(data) {
-    
+    const { _id, options } = data;
+
+    // Loop through the options and update the corresponding DOM elements
+    options.forEach((option) => {
+        const optionId = `${_id.$oid}_${option.answer}`;
+        const optionElement = document.getElementById(optionId);
+
+        if (optionElement) {
+            // Update the vote count in the DOM
+            optionElement.innerHTML = `<strong>${option.answer}:</strong> ${option.votes} votes`;
+        } else {
+            console.warn(`Option element with ID ${optionId} not found.`);
+        }
+    });
 }
 
 /**

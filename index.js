@@ -232,7 +232,19 @@ app.post('/dashboard', async (request, response) => {
 
 
 app.get('/profile', async (request, response) => {
-    
+    if (!request.session.user?.id) {
+        return response.redirect('/');
+    }
+
+    return response.render('profile', {session: request.session})
+});
+
+app.post('/profile', async(request, response)=>{
+    if (!request.session.user?.id) {
+        return response.redirect('/');
+    }
+
+    return response.render('profile', {session: request.session})
 });
 
 
@@ -296,7 +308,7 @@ async function onCreateNewPoll(question, pollOptions) {
     }
     catch (error) {
         console.error(error);
-        return "Error creating the poll, please try again";
+        return "Error creating the poll";
     }
 
     //TODO: Tell all connected sockets that a new poll was added
