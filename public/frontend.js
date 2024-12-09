@@ -1,14 +1,27 @@
+
 // Establish a WebSocket connection to the server
 const socket = new WebSocket('ws://localhost:3000/ws');
 
+socket.addEventListener('open', () => {
+    console.log('WebSocket connection established');
+    socket.send(JSON.stringify({ type: 'test', message: 'hello' })); // test
+});
+
 // Listen for messages from the server
 socket.addEventListener('message', (event) => {
-    const data = JSON.parse(event.data);
-
-    //TODO: Handle the events from the socket
-    if (data.type === 'update') {
-        onIncomingVote(data.data)
+    console.log("should have something", event.data)
+    try {
+        const data = JSON.parse(event.data);
+        if (data.type === 'poll-update') {
+            console.log("Poll update received:", data);
+            onIncomingVote(data);
+        } else {
+            console.log("Unexpected data type:", data.type);
+        }
+    } catch (err) {
+        console.error("Error parsing message:", err);
     }
+    //TODO: Handle the events from the socket
 });
 
 
@@ -37,22 +50,25 @@ function onNewPollAdded(data) {
  * @param {*} data The data from the server (probably containing which poll was updated and the new vote values for that poll)
  */
 function onIncomingVote(data) {
-    const { _id, options } = data;
+    const poll = data.poll;
+    const id = document.getElementById(poll.id);
 
-    // Loop through the options and update the corresponding DOM elements
-    options.forEach((option) => {
-        const optionId = `${_id.$oid}_${option.answer}`;
-        const optionElement = document.getElementById(optionId);
+    if(id){
+        let options = id.querySelector(".poll-options");
+        options.innerHTML='';
 
-        if (optionElement) {
-            // Update the vote count in the DOM
-            optionElement.innerHTML = `<strong>${option.answer}:</strong> ${option.votes} votes`;
-        } else {
-            console.warn(`Option element with ID ${optionId} not found.`);
-        }
-    });
-}
+        poll.options.forEach(({answer, votes}) =>{
+            options.innerHTML += `<li>><strong>${answer}:</strong> ${votes} votes</li>`
+        });
 
+
+        console.log("vote cast")
+    }else{
+        console.error("vote failed");
+    }
+
+
+};
 /**
  * Handles processing a user's vote when they click on an option to vote
  * 
@@ -67,6 +83,8 @@ function onVoteClicked(event) {
     const selectedOption = event.submitter.value;
     
     //TOOD: Tell the server the user voted
+    console.log(`Poll ID: ${pollId}, Selected Option: ${selectedOption}`);
+    socket.send(JSON.stringify({type: 'vote', pollId, option: selectedOption}));
 }
 
 //Adds a listener to each existing poll to handle things when the user attempts to vote
