@@ -2,17 +2,23 @@
 // Establish a WebSocket connection to the server
 const socket = new WebSocket('ws://localhost:3000/ws');
 
+
+
+
 socket.addEventListener('open', () => {
     console.log('WebSocket connection established');
-    socket.send(JSON.stringify({ type: 'test', message: 'hello' })); // test
+    // socket.send(JSON.stringify({ type: 'test', message: 'hello' })); // test
 });
+
+
+
 
 // Listen for messages from the server
 socket.addEventListener('message', (event) => {
     console.log("should have something", event.data)
     try {
         const data = JSON.parse(event.data);
-        if (data.type === 'poll-update') {
+        if (data.type === 'updatePoll') {
             console.log("Poll update received:", data);
             onIncomingVote(data);
         } else {
@@ -51,7 +57,9 @@ function onNewPollAdded(data) {
  */
 function onIncomingVote(data) {
     const poll = data.poll;
-    const id = document.getElementById(poll.id);
+    console.log("THIIIIIS BE THE POLL:", poll);
+    console.log("THIS IS THE ID: ",poll._id) //test that id is getting passed over
+    const id = document.getElementById(poll._id);
 
     if(id){
         let options = id.querySelector(".poll-options");
@@ -84,7 +92,7 @@ function onVoteClicked(event) {
     
     //TOOD: Tell the server the user voted
     console.log(`Poll ID: ${pollId}, Selected Option: ${selectedOption}`);
-    socket.send(JSON.stringify({type: 'vote', pollId, option: selectedOption}));
+    socket.send(JSON.stringify({type: "vote", pollId, option: selectedOption}));
 }
 
 //Adds a listener to each existing poll to handle things when the user attempts to vote

@@ -61,18 +61,48 @@ let connectedClients = [];
 
 //Note: Not all routes you need are present here, some are missing and you'll need to add them yourself.
 
+// app.ws('/ws', (socket, request) => {
+//     connectedClients.push(socket);
+                                                                                                // THIS WAS A TEST TO SEE IF SOCKET WAS WORKING
+//     socket.on('message', (message) => {
+//         console.log("Message received from client:", message);
+//     });
+
+//     socket.on('close', () => {
+//         connectedClients = connectedClients.filter((client) => client !== socket);
+//         console.log("Client disconnected");
+//     });
+// });
+
+
+
+
+
 app.ws('/ws', (socket, request) => {
     connectedClients.push(socket);
 
     socket.on('message', async (message) => {
-        const data = JSON.parse(message);
-        
+        try {
+            const data = JSON.parse(message);
+            console.log("Parsed message from client:", data); // Debug log
+
+            if (data.type === "vote") {
+                console.log("Processing vote:", data);
+                await onNewVote(data.pollId, data.option);
+            } else {
+                console.warn("Unhandled message type:", data.type);
+            }
+        } catch (error) {
+            console.error("Error parsing WebSocket message:", error);
+        }
     });
 
-    socket.on('close', async (message) => {
-        
-    });
 });
+
+
+
+
+
 
 app.get('/', async (request, response) => {
     if (request.session.user?.id) {
@@ -303,15 +333,22 @@ async function onCreateNewPoll(question, pollOptions) {
         const newPoll = new Polls({ question, options: pollOptions }); 
         await newPoll.save();
         console.log("Poll saved to MongoDB");
-        return true;
-        // response.render("createPoll", { successMessage: "Your poll has been made!" });
-    }
-    catch (error) {
+        //TODO: Tell all connected sockets that a new poll was added
+        for (const client of connectedClients) {
+            if (client.readyState === 1) {
+              client.send(JSON.stringify({ type: "newPoll", Polls }));
+            }
+          }
+       
+        // response.render("createPoll", { successMessage: "Your poll has been made!" })   
+    
+    }catch (error) {
         console.error(error);
         return "Error creating the poll";
     }
 
-    //TODO: Tell all connected sockets that a new poll was added
+    
+    
 
     return null;
 }
@@ -333,9 +370,27 @@ async function onCreateNewPoll(question, pollOptions) {
  * @param {string} pollId The ID of the poll that was voted on
  * @param {string} selectedOption Which option the user voted for
  */
+
+// SENDS TO MONGO DATABASE PLEAAAAAAAAAAAAAAAAAASE DONT FORGET TO UPDATE THIS LATER
 async function onNewVote(pollId, selectedOption) {
     try {
-        
+        const poll = await Polls.findById(pollId);
+        if(!poll){
+            console.log("Cannot be found")
+            return;
+        }
+
+        const option = poll.options.find((select) => select.answer === selectedOption);
+        if(option){
+            option.votes+=1;
+            await poll.save();
+            console.log("poll updated")
+            for (const client of connectedClients){
+                if(client.readyState ===1){
+                    client.send(JSON.stringify({type:"updatePoll", poll}));
+                }
+            }
+        }
     }
     catch (error) {
         console.error('Error updating poll:', error);
