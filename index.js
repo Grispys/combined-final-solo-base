@@ -5,7 +5,7 @@ const mongoose = require('mongoose');
 const session = require('express-session');
 const bcrypt = require('bcrypt');
 const { connect } = require('http2');
-const { connected } = require('process');
+const { connected, resourceUsage } = require('process');
 const { request } = require('http');
 
 const PORT = 3000;
@@ -267,6 +267,7 @@ app.get('/profile', async (request, response) => {
         return response.redirect('/');
     }
 
+
     return response.render('profile', {session: request.session})
 });
 
@@ -300,6 +301,10 @@ app.get('/createPoll', async (request, response) => {
 
 // Poll creation
 app.post('/createPoll', async (request, response) => {
+    if (!request.session.user?.id) {
+        return response.redirect('/');
+    }
+    
     const { question, options } = request.body;
     const formattedOptions = Object.values(options).map((option) => ({ answer: option, votes: 0 }));
 
@@ -387,9 +392,13 @@ async function onNewVote(pollId, selectedOption, request) {
 
 
         if(user){
-            user.votesCast+=1;
+            thisUser.votesCast+=1;
             await thisUser.save()
             console.log("User profile updated")
+            request.session.user.votesCast = thisUser.votesCast // updatin in memory so the profile apge can display it
+            await request.session.save(); // had to add this to save the session so it can actually be displayed very cool 
+            console.log("current user votes:", request.session.user.votesCast)
+        
         }
 
         if(option){
