@@ -24,6 +24,7 @@ mongoose.connect(MONGO_URI)
 const userSchema = new mongoose.Schema({
     username: { type: String, required: true },
     password: { type: String, required: true },
+    votesCast: {type: Number, required: true, default: 0 },  //how i decided to handle profile showing number of votes you've made
   });
 
 const pollSchema = new mongoose.Schema({
@@ -88,7 +89,7 @@ app.ws('/ws', (socket, request) => {
 
             if (data.type === "vote") {
                 console.log("Processing vote:", data);
-                await onNewVote(data.pollId, data.option);
+                await onNewVote(data.pollId, data.option, request);
             } else {
                 console.warn("Unhandled message type:", data.type);
             }
@@ -372,15 +373,25 @@ async function onCreateNewPoll(question, pollOptions) {
  */
 
 // SENDS TO MONGO DATABASE PLEAAAAAAAAAAAAAAAAAASE DONT FORGET TO UPDATE THIS LATER
-async function onNewVote(pollId, selectedOption) {
+async function onNewVote(pollId, selectedOption, request) {
     try {
         const poll = await Polls.findById(pollId);
+        const thisUser = await User.findOne({ username: request.session.user.username });
         if(!poll){
             console.log("Cannot be found")
             return;
         }
 
         const option = poll.options.find((select) => select.answer === selectedOption);
+        const user = request.session.user;
+
+
+        if(user){
+            user.votesCast+=1;
+            await thisUser.save()
+            console.log("User profile updated")
+        }
+
         if(option){
             option.votes+=1;
             await poll.save();
